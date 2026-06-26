@@ -1,15 +1,67 @@
 classDiagram
-    %% Replace the placeholders below with your actual classes, attributes, methods, and relationships.
-    %% Keep this file updated so it matches your final implementation.
-
-    class ClassName {
-        +type attribute
-        +method() returnType
+    class Owner {
+        +int owner_id
+        +str name
+        +str email
+        +str phone
+        +str address
+        +list~Pet~ pets
+        +add_pet(pet Pet) None
+        +remove_pet(pet_id int) None
+        +get_all_tasks() list~Task~
+        +get_all_appointments() list~Appointment~
     }
 
-    class AnotherClass {
-        +type attribute
-        +method() returnType
+    class Pet {
+        +int pet_id
+        +str name
+        +str species
+        +str breed
+        +int age
+        +float weight
+        +str health_notes
+        +Owner owner
+        +get_upcoming_tasks() list~Task~
+        +add_task(task Task) None
+        +get_care_history() list~Task~
+        +add_appointment(appt Appointment) None
+        +get_upcoming_appointments() list~Appointment~
     }
 
-    ClassName --> AnotherClass : relationship
+    class Task {
+        +int task_id
+        +str title
+        +str description
+        +datetime due_date
+        +bool is_complete
+        +str priority
+        +int duration_minutes
+        +str category
+        +str recurrence
+        +Pet pet
+        +mark_complete() None
+        +reschedule(new_date datetime) None
+        +is_overdue() bool
+        +get_priority_score() int
+    }
+
+    class Appointment {
+        +int appointment_id
+        +str title
+        +datetime date_time
+        +str location
+        +str vet_name
+        +str appointment_type
+        +str status
+        +int duration_minutes
+        +str notes
+        +Pet pet
+        +reschedule(new_datetime datetime) None
+        +cancel() None
+        +get_reminder() str
+        +is_upcoming() bool
+    }
+
+    Owner "1" --> "0..*" Pet : owns
+    Pet "1" --> "0..*" Task : has
+    Pet "1" --> "0..*" Appointment : schedules
