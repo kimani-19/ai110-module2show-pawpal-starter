@@ -2,6 +2,8 @@
 
 ## 1. System Design
 
+Three core actions the user should be able to perform are: adding a pet to the system, scheduling a walk for that pet, and viewing today's tasks or upcoming appointments in one place.
+
 **a. Initial design**
 
 - Briefly describe your initial UML design.
