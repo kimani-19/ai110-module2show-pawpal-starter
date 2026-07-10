@@ -79,13 +79,42 @@ is a reasonable next iteration if task volume grows.
 
 **a. What you tested**
 
-- What behaviors did you test?
-- Why were these tests important?
+`tests/test_pawpal.py` grew from 11 to 25 tests, organized around the three behaviors
+that matter most for a scheduler: **sorting correctness**, **recurrence logic**, and
+**conflict detection**, plus the task/appointment lifecycle they all depend on.
+
+- **Sorting** — `get_upcoming_tasks()` and `Owner.get_all_tasks()` return tasks in
+  chronological order across *different days*, not just time-of-day on the same day
+  (`sort_by_time()` was already covered but only tests the HH:MM case). Also tested:
+  same-priority same-instant ties break deterministically, and completed tasks never
+  leak into `suggest_next_task()` / `build_daily_plan()`.
+- **Recurrence** — completing a `daily` task spawns the next occurrence exactly one
+  day later; completing a `weekly` task spawns one exactly one week later; and
+  completing the *auto-generated follow-up* itself chains a third occurrence with a
+  correctly incremented `task_id`. This last case matters because `mark_task_complete()`
+  computes the new ID via `max(owner.get_all_tasks()) + 1` — a subtle cross-object
+  dependency that a single-completion test wouldn't catch.
+- **Conflict detection** — flags two tasks at the exact same `due_date`, scales to
+  three simultaneous clashes (not just pairs), ignores completed tasks, and doesn't
+  crash on a task with `pet=None` (the "unassigned" label in the warning string).
+- **Edge cases** — an empty pet (no tasks/appointments at all) returns `[]`/`None`
+  everywhere instead of raising, and the `Appointment` lifecycle (reschedule resets
+  status, cancel removes it from "upcoming") was untested before this pass.
+
+These were important because the scheduler's value proposition *is* correct ordering
+and conflict-flagging — a bug there silently produces a wrong daily plan rather than
+an obvious crash, so it needs direct test coverage rather than relying on manual
+spot-checks in the Streamlit UI.
 
 **b. Confidence**
 
-- How confident are you that your scheduler works correctly?
-- What edge cases would you test next if you had more time?
+Fairly confident in the exact-match logic covered above — all 25 tests pass and each
+one pins down a specific, previously-unverified behavior rather than re-testing the
+happy path. The known gap is the tradeoff already noted in Section 2: conflict
+detection only catches identical `due_date` values, not overlapping durations, so
+that's the next edge case worth testing (and implementing) if task volume grows —
+e.g. two tasks 10 minutes apart where the first's `duration_minutes` runs into the
+second's start time.
 
 ---
 

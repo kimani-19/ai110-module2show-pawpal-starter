@@ -160,17 +160,63 @@ Run `python3 main.py` to see the full daily report in the terminal:
 
 ```bash
 # Run the full test suite:
-pytest
+python -m pytest
 
 # Run with coverage:
 pytest --cov
 ```
 
+The suite (`tests/test_pawpal.py`, 25 tests) covers:
+
+- **Task lifecycle** — `mark_complete()` sets `is_complete`/`completed_at`; adding a task links it to the right `Pet`.
+- **Sorting correctness** — `Pet.get_upcoming_tasks()` and `Owner.get_all_tasks()` return tasks in chronological order across different days (not just time-of-day), including deterministic tie-breaking when two tasks share a due date; `Scheduler.sort_by_time()`, `suggest_next_task()`, and `build_daily_plan()` all exclude completed tasks correctly.
+- **Recurrence logic** — completing a `daily` or `weekly` task auto-schedules the next occurrence on the correct date, and this chains correctly across repeated completions (the new task's ID is derived from the full task list, not just the current pet).
+- **Conflict detection** — `Scheduler.detect_conflicts()` flags two or more tasks at the exact same `due_date`, ignores completed tasks, and handles tasks with no pet assigned without crashing.
+- **Filtering** — `Scheduler.filter_tasks()` by pet name and/or completion status, including an unknown pet name returning an empty list.
+- **Appointment lifecycle** — `reschedule()` resets status to `scheduled`, `cancel()` removes it from `get_upcoming_appointments()`, and `get_reminder()` falls back gracefully when no pet is assigned.
+- **Edge cases** — a pet with no tasks/appointments at all returns empty collections everywhere instead of raising.
+
 Sample test output:
 
 ```
-# Paste your pytest output here
+============================= test session starts ==============================
+platform darwin -- Python 3.13.13, pytest-9.0.3, pluggy-1.6.0
+rootdir: /Users/kimani19/Documents/ai110-module2show-pawpal-starter
+plugins: anyio-4.13.0
+collecting ... collected 25 items
+
+tests/test_pawpal.py::test_mark_complete_sets_is_complete PASSED         [  4%]
+tests/test_pawpal.py::test_mark_complete_stamps_completed_at PASSED      [  8%]
+tests/test_pawpal.py::test_add_task_increases_task_count PASSED          [ 12%]
+tests/test_pawpal.py::test_add_task_links_pet_reference PASSED           [ 16%]
+tests/test_pawpal.py::test_sort_by_time_orders_earliest_first PASSED     [ 20%]
+tests/test_pawpal.py::test_get_upcoming_tasks_returns_chronological_order PASSED [ 24%]
+tests/test_pawpal.py::test_get_all_tasks_orders_chronologically_across_pets PASSED [ 28%]
+tests/test_pawpal.py::test_filter_tasks_by_pet_name PASSED               [ 32%]
+tests/test_pawpal.py::test_filter_tasks_by_completion_status PASSED      [ 36%]
+tests/test_pawpal.py::test_detect_conflicts_flags_tasks_at_same_time PASSED [ 40%]
+tests/test_pawpal.py::test_detect_conflicts_ignores_completed_tasks PASSED [ 44%]
+tests/test_pawpal.py::test_mark_task_complete_schedules_next_daily_occurrence PASSED [ 48%]
+tests/test_pawpal.py::test_mark_task_complete_returns_none_for_non_recurring_task PASSED [ 52%]
+tests/test_pawpal.py::test_empty_pet_returns_empty_collections_not_errors PASSED [ 56%]
+tests/test_pawpal.py::test_mark_task_complete_schedules_next_weekly_occurrence PASSED [ 60%]
+tests/test_pawpal.py::test_mark_task_complete_chains_across_multiple_completions PASSED [ 64%]
+tests/test_pawpal.py::test_get_upcoming_tasks_orders_same_due_date_by_priority PASSED [ 68%]
+tests/test_pawpal.py::test_suggest_next_task_ignores_completed_tasks PASSED [ 72%]
+tests/test_pawpal.py::test_build_daily_plan_excludes_completed_and_other_days PASSED [ 76%]
+tests/test_pawpal.py::test_filter_tasks_by_unknown_pet_name_returns_empty PASSED [ 80%]
+tests/test_pawpal.py::test_detect_conflicts_lists_all_clashing_tasks PASSED [ 84%]
+tests/test_pawpal.py::test_detect_conflicts_handles_task_with_no_pet_assigned PASSED [ 88%]
+tests/test_pawpal.py::test_appointment_reschedule_resets_status_to_scheduled PASSED [ 92%]
+tests/test_pawpal.py::test_appointment_cancel_excludes_it_from_upcoming PASSED [ 96%]
+tests/test_pawpal.py::test_get_reminder_falls_back_to_generic_pet_name_when_unassigned PASSED [100%]
+
+============================== 25 passed in 0.03s ==============================
 ```
+
+**Confidence Level:** ⭐⭐⭐⭐☆ (4/5)
+
+All 25 tests pass, covering sorting, recurrence, conflict detection, filtering, and the full task/appointment lifecycle, including edge cases like empty pets and unassigned tasks. Not a full 5 stars because conflict detection is exact-time-match only — it doesn't catch overlapping task *durations* (e.g. a 20-minute task at 11:00 AM and a 15-minute task starting at 11:10 AM), a known tradeoff documented in `reflection.md` (section 2b).
 
 ## 📐 Smarter Scheduling
 
