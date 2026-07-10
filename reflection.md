@@ -38,8 +38,13 @@ The original design had no class to own the scheduling logic. `get_upcoming_task
 
 **a. Constraints and priorities**
 
-- What constraints does your scheduler consider (for example: time, priority, preferences)?
-- How did you decide which constraints mattered most?
+The scheduler considers three constraints, in this order of importance:
+
+1. **Priority** (`low`/`medium`/`high`, scored 1–3 by `Task.get_priority_score()`) — the primary sort key for `build_daily_plan()` and `suggest_next_task()`. A medication task and a playtime task due at the same hour should not be treated as interchangeable, so priority dominates.
+2. **Time** (`due_date`) — the tie-breaker within a priority tier, and the sole key for `sort_by_time()` when the question is "what's next" rather than "what matters most." Time is also what `detect_conflicts()` groups on, since two tasks literally cannot both happen at the same instant.
+3. **Completion status** — every scheduler method excludes completed tasks before applying priority/time ordering, so a finished task never re-appears in a plan or a conflict warning.
+
+Priority was chosen as the dominant constraint over pure chronological order because a pet owner's real failure mode is missing something *important* (medication, a vet-mandated task), not just something *early*. Two low-effort tasks being slightly out of time order costs little; a high-priority task getting buried under lower-priority-but-earlier ones costs more. "Owner preference" (e.g. a preferred walk time) was considered but not implemented — there was no preference data on `Owner` to hang it off of, and adding a rule that isn't backed by a real field would have been dead code, so it was left as a possible extension rather than a constraint the scheduler currently enforces.
 
 **b. Tradeoffs**
 
@@ -65,13 +70,13 @@ is a reasonable next iteration if task volume grows.
 
 **a. How you used AI**
 
-- How did you use AI tools during this project (for example: design brainstorming, debugging, refactoring)?
-- What kinds of prompts or questions were most helpful?
+The most effective use of the AI assistant was as a **design reviewer**, not a code generator: pasting the class skeleton from Phase 1 and asking it to find structural problems before any scheduling logic was written. That single pass surfaced all four issues listed in Section 1b — the `Task.pet`/`Appointment.pet` circular-dependency, the missing `init=False` on private dataclass fields, the missing `completed_at` timestamp, and the absence of a `Scheduler` class. Those are exactly the kind of mistakes that are cheap to fix before any logic depends on them and expensive to fix after. The next most useful mode was **targeted implementation review** — asking "what edge cases does `detect_conflicts()`/`mark_task_complete()` miss?" turned directly into the edge-case tests in Section 4 (task with no pet, chained recurrence, empty pet). Broad open-ended prompts ("make this better") were much less useful than specific ones naming a method and asking what could break it.
 
 **b. Judgment and verification**
 
-- Describe one moment where you did not accept an AI suggestion as-is.
-- How did you evaluate or verify what the AI suggested?
+The clearest rejected suggestion was for `detect_conflicts()`. When asked how to make conflict detection more robust, the AI's first suggestion was interval-overlap detection: sort tasks by start time and sweep-line-compare `[start, start + duration)` ranges so a 20-minute task at 11:00 and a 15-minute task at 11:10 would both be flagged, even though their `due_date` values differ. That is a genuinely more correct model of "conflict," but it was **not** adopted for this iteration — it trades an O(n) dict-grouping pass for either an O(n²) pairwise scan or a sweep-line algorithm, and for a single owner with a handful of pets and a few tasks a day, that complexity wasn't justified yet. Instead, the simpler exact-`due_date`-match version was kept, and the limitation was written down explicitly (Section 2b, and in the README) rather than silently accepted. Verification here meant reasoning about the actual data volume the app would see, not just which algorithm was "more correct" in the abstract — the more sophisticated suggestion is documented as the obvious next step if task volume grows, rather than being either blindly adopted or discarded.
+
+Separately, keeping design-review conversations, implementation conversations, and test-writing conversations in **separate chat sessions** (rather than one long thread) helped avoid a subtle failure mode: an AI assistant that's just spent an hour deep in scheduling-logic details tends to keep suggesting logic tweaks even when what's actually needed is a fresh, adversarial read of "what's wrong with this class design" or "what test is missing." Starting a new session for each phase reset that context so the AI's suggestions matched the actual task at hand instead of anchoring on whatever it had been discussing five messages earlier.
 
 ---
 
@@ -122,12 +127,12 @@ second's start time.
 
 **a. What went well**
 
-- What part of this project are you most satisfied with?
+The recurrence logic in `Pet.mark_task_complete()` is the part I'm most satisfied with, specifically how the tests exposed a subtlety the implementation itself doesn't advertise: the next task's ID is computed from `owner.get_all_tasks()` (every pet's tasks) rather than from `self._tasks` (just this pet's). That's a genuine cross-object dependency — get it wrong and two pets could eventually generate colliding task IDs — and it only surfaced because the test suite deliberately chained multiple completions across pets instead of testing one completion in isolation (Section 4a). Catching that kind of bug through a test built to exercise it, rather than through manual spot-checking in the Streamlit UI, is the outcome the design was aiming for.
 
 **b. What you would improve**
 
-- If you had another iteration, what would you improve or redesign?
+Given another iteration, I'd implement the overlap-aware conflict detection described in Section 2b instead of leaving it as documented future work — right now `detect_conflicts()` would miss a 20-minute grooming session at 11:00 AM clashing with a 15-minute walk starting at 11:10 AM, which is a real gap for a busy pet owner juggling multiple tasks. I'd also add owner-level preferences (e.g. a preferred time window per task category) as an actual field on `Owner` so the scheduler's priority-then-time ordering (Section 2a) could be refined by a third constraint instead of stopping at two.
 
 **c. Key takeaway**
 
-- What is one important thing you learned about designing systems or working with AI on this project?
+Being the "lead architect" with an AI assistant meant the value came from deciding *what to ask* and *what to keep*, not from writing every line. The AI was consistently good at generating options (an overlap-detection algorithm, a longer test list, a UML update) but had no way to know which of those options fit the actual constraints of this project — a single owner, a handful of pets, a classroom deadline. That judgment call was mine every time: keep the simple O(n) conflict check and write down the tradeoff, rather than adopt the more "correct" but heavier algorithm just because it was suggested. The discipline this project reinforced is that reviewing and rejecting AI suggestions with a stated reason is itself part of the design work, not a detour from it — and writing that reason down (in this reflection, in code comments, in the README) is what keeps the system coherent instead of turning into whatever the AI proposed most recently.

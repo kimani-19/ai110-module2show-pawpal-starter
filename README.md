@@ -42,6 +42,11 @@ pip install -r requirements.txt
 6. Connect your logic to the Streamlit UI in `app.py`.
 7. Refine UML so it matches what you actually built.
 
+## 📐 System Design (UML)
+
+- [`diagrams/uml.mmd`](diagrams/uml.mmd) — the initial class design drafted before implementation (Owner, Pet, Task, Appointment).
+- [`diagrams/uml_final.mmd`](diagrams/uml_final.mmd) — the as-built design, updated to add the `Scheduler` class and the methods/fields (`Task.completed_at`, `Task.get_next_due_date()`, `Pet.mark_task_complete()`, etc.) that were introduced while implementing the scheduling logic. See `reflection.md` (Section 1b) for why each change was made.
+
 ## 🖥️ Sample Output
 
 Run `python3 main.py` to see the full daily report in the terminal:
@@ -218,6 +223,17 @@ tests/test_pawpal.py::test_get_reminder_falls_back_to_generic_pet_name_when_unas
 
 All 25 tests pass, covering sorting, recurrence, conflict detection, filtering, and the full task/appointment lifecycle, including edge cases like empty pets and unassigned tasks. Not a full 5 stars because conflict detection is exact-time-match only — it doesn't catch overlapping task *durations* (e.g. a 20-minute task at 11:00 AM and a 15-minute task starting at 11:10 AM), a known tradeoff documented in `reflection.md` (section 2b).
 
+## ✨ Features
+
+- **Multi-pet, multi-task tracking** — an `Owner` can manage several `Pet`s, each with its own list of care `Task`s and vet `Appointment`s.
+- **Priority-ordered daily plan** — `Scheduler.build_daily_plan()` builds today's task list ordered by priority (high → low), then by due time within a priority tier.
+- **Time-of-day sorting** — `Scheduler.sort_by_time()` sorts tasks by clock time regardless of calendar date, so an owner can see "what's next" independent of which day it falls on.
+- **Pet / status filtering** — `Scheduler.filter_tasks()` narrows the task list down to one pet, one completion status, or both, so the UI table only shows what's relevant.
+- **Conflict warnings** — `Scheduler.detect_conflicts()` flags any set of pending tasks scheduled at the exact same time, across pets, so an owner never double-books themselves.
+- **Daily/weekly recurrence** — completing a recurring task via `Pet.mark_task_complete()` automatically schedules its next occurrence, no manual re-entry required.
+- **Overdue tracking & next-task suggestion** — `Scheduler.get_overdue_tasks()` and `Scheduler.suggest_next_task()` surface what's late and what to do next.
+- **Appointment lifecycle & reminders** — `Appointment.reschedule()`/`cancel()` manage status, and `get_reminder()` produces a human-readable countdown string.
+
 ## 📐 Smarter Scheduling
 
 | Feature | Method(s) | Notes |
@@ -229,12 +245,65 @@ All 25 tests pass, covering sorting, recurrence, conflict detection, filtering, 
 
 ## 📸 Demo Walkthrough
 
-Describe your app in numbered steps so a reader can follow along without watching a video:
+### Main UI features
 
-1. <!-- Describe this step -->
-2. <!-- Describe this step -->
-3. <!-- Describe this step -->
-4. <!-- Describe this step -->
-5. <!-- Add more steps as needed -->
+Running `streamlit run app.py` opens a single-page app with four sections:
 
-**Screenshot or video** *(optional)*: <!-- Insert a screenshot or link to a demo video here -->
+- **Owner & Pets** — edit the owner's name and add additional pets (name + species). All pets persist in `st.session_state.owner` across reruns.
+- **Add a Task** — pick which pet the task belongs to, then set its title, priority, category, duration, recurrence, due date, and due time.
+- **Tasks** — a live table of every task across every pet, with three controls that call `Scheduler` directly:
+  - a **"Sort by time-of-day"** checkbox → `Scheduler.sort_by_time()`
+  - **pet** and **status** filter dropdowns → `Scheduler.filter_tasks(pet_name=, is_complete=)`
+  - a **"Mark complete"** selector → `Pet.mark_task_complete()`, plus a permanent conflict check → `Scheduler.detect_conflicts()`
+- **Build Today's Schedule** — a button that calls `Scheduler.build_daily_plan()` for today's date and re-checks that specific plan for conflicts and overdue tasks.
+
+### Example workflow
+
+1. Add a pet (e.g. "Luna", species "cat") in the **Manage pets** expander.
+2. Add a task for Luna: title "Dinner feeding", priority "high", due today at 6:00 PM.
+3. Add a second task for the existing pet "Mochi": title "Evening walk", priority "medium", due today at 6:00 PM (same time, on purpose).
+4. Scroll to **Tasks** — the table shows both tasks, and the conflict check immediately renders `st.warning("⚠️ Conflict at 06:00 PM: 'Dinner feeding' (Luna), 'Evening walk' (Mochi) are all scheduled at the same time.")`.
+5. Click **Generate schedule** — the daily plan lists both tasks ordered by priority (Dinner feeding first, since "high" outranks "medium"), and the same conflict warning appears again scoped to just today's plan.
+6. Use **Mark complete** to complete a recurring task (e.g. a "daily" feeding) — a `st.success` banner confirms the next day's occurrence was auto-scheduled, and the new task appears in the table on rerun.
+
+### Key Scheduler behaviors shown
+
+- **Sorting** — toggling "Sort by time-of-day" re-orders the same task list by `due_date.time()` instead of by full date, so recurring tasks due at the same clock time on different days line up together.
+- **Filtering** — selecting a pet name or a status (Pending/Complete) narrows the table without touching the underlying data, since `filter_tasks()` always reads fresh from `owner.get_all_tasks()`.
+- **Conflict warnings** — surfaced with `st.warning`, which is the right visual weight for "you should look at this before your day starts" without blocking the user like an error would; a `st.success` confirms the all-clear state so the absence of a warning isn't ambiguous with the section just being empty.
+- **Recurrence** — completing a daily/weekly task doesn't just check it off, it produces a brand new `Task` for the next occurrence, visible immediately in the table after `st.rerun()`.
+
+### Sample CLI output (`python3 main.py`)
+
+```
+==================================================
+  Today's Schedule
+==================================================
+  1. [HIGH] Breakfast feeding
+       Pet      : Mochi
+       Category : feeding
+       Due      : 08:00 AM
+       Duration : 10 min
+       Status   : ⚠ Overdue
+  2. [HIGH] Allergy medication
+       Pet      : Luna
+       Category : medication
+       Due      : 08:30 AM
+       Duration : 5 min
+       Status   : ⚠ Overdue
+
+==================================================
+  Schedule Conflicts
+==================================================
+  ⚠ Conflict at 06:00 PM: 'Dinner feeding' (Luna), 'Evening walk' (Mochi) are all scheduled at the same time.
+
+==================================================
+  Recurring Task Demo
+==================================================
+  Completed: 'Morning walk' (daily) for Mochi.
+  → Next occurrence auto-scheduled: 'Morning walk' due Friday 07:30 AM
+```
+
+The full report (pets summary, overdue tasks, care history, upcoming appointments, sort/filter demos) is shown in [🖥️ Sample Output](#️-sample-output) above.
+
+**Screenshot or video** *(optional)*: not included — the text walkthrough and CLI output above are the graded artifacts.
