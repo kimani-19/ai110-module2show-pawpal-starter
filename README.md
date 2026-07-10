@@ -74,13 +74,25 @@ Run `python3 main.py` to see the full daily report in the terminal:
        Due      : 08:30 AM
        Duration : 5 min
        Status   : ⚠ Overdue
-  3. [MEDIUM] Grooming session
+  3. [HIGH] Dinner feeding
+       Pet      : Luna
+       Category : feeding
+       Due      : 06:00 PM
+       Duration : 10 min
+       Status   : ⚠ Overdue
+  4. [MEDIUM] Grooming session
        Pet      : Mochi
        Category : grooming
        Due      : 11:00 AM
        Duration : 20 min
        Status   : ⚠ Overdue
-  4. [LOW] Playtime
+  5. [MEDIUM] Evening walk
+       Pet      : Mochi
+       Category : exercise
+       Due      : 06:00 PM
+       Duration : 15 min
+       Status   : ⚠ Overdue
+  6. [LOW] Playtime
        Pet      : Luna
        Category : exercise
        Due      : 05:00 PM
@@ -90,7 +102,7 @@ Run `python3 main.py` to see the full daily report in the terminal:
 ==================================================
   Care History (Completed Today)
 ==================================================
-  ✓ Morning walk (Mochi) — completed at 07:54 PM
+  ✓ Morning walk (Mochi) — completed at 09:44 PM
 
 ==================================================
   Upcoming Appointments
@@ -104,6 +116,42 @@ Run `python3 main.py` to see the full daily report in the terminal:
 ==================================================
   → Breakfast feeding for Mochi
     Priority: high | Due: 08:00 AM
+
+==================================================
+  All Tasks Sorted by Time
+==================================================
+  1. Thu 07:30 AM — Morning walk (Mochi)
+  2. Fri 07:30 AM — Morning walk (Mochi)
+  3. Thu 08:00 AM — Breakfast feeding (Mochi)
+  4. Thu 08:30 AM — Allergy medication (Luna)
+  5. Thu 11:00 AM — Grooming session (Mochi)
+  6. Thu 05:00 PM — Playtime (Luna)
+  7. Thu 06:00 PM — Dinner feeding (Luna)
+  8. Thu 06:00 PM — Evening walk (Mochi)
+
+==================================================
+  Filter Demo: Mochi's Pending Tasks
+==================================================
+  • Breakfast feeding — due 08:00 AM
+  • Grooming session — due 11:00 AM
+  • Evening walk — due 06:00 PM
+  • Morning walk — due 07:30 AM
+
+==================================================
+  Filter Demo: All Completed Tasks
+==================================================
+  • Morning walk (Mochi)
+
+==================================================
+  Schedule Conflicts
+==================================================
+  ⚠ Conflict at 06:00 PM: 'Dinner feeding' (Luna), 'Evening walk' (Mochi) are all scheduled at the same time.
+
+==================================================
+  Recurring Task Demo
+==================================================
+  Completed: 'Morning walk' (daily) for Mochi.
+  → Next occurrence auto-scheduled: 'Morning walk' due Friday 07:30 AM
 
 ==================================================
 ```
@@ -126,14 +174,12 @@ Sample test output:
 
 ## 📐 Smarter Scheduling
 
-> Fill in once you've implemented scheduling logic.
-
 | Feature | Method(s) | Notes |
 |---------|-----------|-------|
-| Task sorting | | e.g., by priority, duration |
-| Filtering | | e.g., skip tasks if time runs out |
-| Conflict handling | | e.g., overlapping time slots |
-| Recurring tasks | | e.g., daily vs. weekly |
+| Task sorting | `Scheduler.sort_by_time()` | Sorts tasks by time-of-day (`due_date.time()`), earliest first — independent of which calendar date each task falls on. |
+| Filtering | `Scheduler.filter_tasks(pet_name=, is_complete=)` | Filters the owner's tasks by pet name and/or completion status; either argument can be omitted to skip that filter. |
+| Conflict handling | `Scheduler.detect_conflicts()` | Groups pending tasks by exact `due_date` and returns a plain-string warning for each group of 2+ clashing tasks (same pet or different pets), instead of raising an exception. Only exact time matches are caught — see the tradeoff noted in `reflection.md` (2b). |
+| Recurring tasks | `Task.get_next_due_date()`, `Pet.mark_task_complete()` | When a task with `recurrence="daily"` or `"weekly"` is completed via `Pet.mark_task_complete(task_id)`, a new `Task` is automatically created and added for the next occurrence (`due_date + timedelta(days=1)` or `+ timedelta(weeks=1)`). |
 
 ## 📸 Demo Walkthrough
 

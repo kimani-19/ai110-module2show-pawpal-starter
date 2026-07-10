@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 
 
 @dataclass
@@ -35,6 +35,14 @@ class Task:
     def get_priority_score(self) -> int:
         """Return a numeric score for the priority (low=1, medium=2, high=3) for use in scheduling."""
         return {"low": 1, "medium": 2, "high": 3}.get(self.priority, 2)
+
+    def get_next_due_date(self) -> datetime | None:
+        """Return the due_date of this task's next occurrence based on its recurrence, or None if it doesn't recur."""
+        if self.recurrence == "daily":
+            return self.due_date + timedelta(days=1)
+        if self.recurrence == "weekly":
+            return self.due_date + timedelta(weeks=1)
+        return None
 
 
 @dataclass
@@ -105,6 +113,36 @@ class Pet:
         """Add a Task to this pet's internal task list and link the task back to this pet."""
         task.pet = self
         self._tasks.append(task)
+
+    def mark_task_complete(self, task_id: int) -> Task | None:
+        """Mark the task with the given task_id complete and, if it recurs, schedule its next occurrence.
+
+        Returns the newly created follow-up Task when the completed task has a "daily" or
+        "weekly" recurrence, or None if the task has no recurrence (or task_id isn't found).
+        """
+        task = next((t for t in self._tasks if t.task_id == task_id), None)
+        if task is None:
+            return None
+
+        task.mark_complete()
+
+        next_due_date = task.get_next_due_date()
+        if next_due_date is None:
+            return None
+
+        next_task_id = max((t.task_id for t in self.owner.get_all_tasks()), default=0) + 1
+        next_task = Task(
+            task_id=next_task_id,
+            title=task.title,
+            description=task.description,
+            due_date=next_due_date,
+            priority=task.priority,
+            duration_minutes=task.duration_minutes,
+            category=task.category,
+            recurrence=task.recurrence,
+        )
+        self.add_task(next_task)
+        return next_task
 
     def get_upcoming_tasks(self) -> list[Task]:
         """Return all incomplete tasks whose due_date is in the future, sorted by due date then priority."""
@@ -199,3 +237,57 @@ class Scheduler:
         if not pending:
             return None
         return sorted(pending, key=lambda t: (-t.get_priority_score(), t.due_date))[0]
+
+    def sort_by_time(self, tasks: list[Task] | None = None) -> list[Task]:
+        """Sort tasks by time-of-day (HH:MM), earliest first, regardless of calendar date.
+
+        Defaults to every task across all of the owner's pets if `tasks` isn't given.
+        Uses `due_date.time()` as the sort key -- the datetime equivalent of parsing an
+        "HH:MM" string with `datetime.strptime(s, "%H:%M").time()` and sorting on that.
+        """
+        if tasks is None:
+            tasks = self.owner.get_all_tasks()
+        return sorted(tasks, key=lambda t: t.due_date.time())
+
+    def filter_tasks(
+        self,
+        pet_name: str | None = None,
+        is_complete: bool | None = None,
+    ) -> list[Task]:
+        """Return all tasks across the owner's pets, optionally filtered by pet name and/or completion status."""
+        tasks = self.owner.get_all_tasks()
+        if pet_name is not None:
+            tasks = [t for t in tasks if t.pet is not None and t.pet.name == pet_name]
+        if is_complete is not None:
+            tasks = [t for t in tasks if t.is_complete == is_complete]
+        return tasks
+
+    def detect_conflicts(self, tasks: list[Task] | None = None) -> list[str]:
+        """Detect pending tasks scheduled at the exact same due_date and return a warning per clash.
+
+        This is a lightweight check: it groups tasks by their exact due_date, so it only
+        catches exact time matches (not overlapping durations), and it ignores completed
+        tasks since a finished task can no longer clash with anything. Returns a list of
+        human-readable warning strings instead of raising, so callers can display them
+        without the scheduler ever crashing the program.
+        """
+        if tasks is None:
+            tasks = self.owner.get_all_tasks()
+
+        groups: dict[datetime, list[Task]] = {}
+        for t in tasks:
+            if t.is_complete:
+                continue
+            groups.setdefault(t.due_date, []).append(t)
+
+        warnings = []
+        for due_date, clashing in groups.items():
+            if len(clashing) < 2:
+                continue
+            names = ", ".join(
+                f"'{t.title}' ({t.pet.name if t.pet else 'unassigned'})" for t in clashing
+            )
+            warnings.append(
+                f"Conflict at {due_date.strftime('%I:%M %p')}: {names} are all scheduled at the same time."
+            )
+        return warnings

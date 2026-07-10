@@ -43,8 +43,21 @@ The original design had no class to own the scheduling logic. `get_upcoming_task
 
 **b. Tradeoffs**
 
-- Describe one tradeoff your scheduler makes.
-- Why is that tradeoff reasonable for this scenario?
+`Scheduler.detect_conflicts()` only flags tasks whose `due_date` matches **exactly**
+(down to the minute) — it does not check whether two tasks' durations *overlap*. A
+20-minute grooming session at 11:00 AM and a 15-minute walk at 11:10 AM genuinely
+conflict (the second starts before the first ends), but as implemented they would not
+be flagged, because their `due_date` values differ.
+
+This tradeoff is reasonable for now because exact-match grouping is O(n) (a single
+pass building a `dict` keyed by `due_date`), while true overlap detection means
+comparing every task's `[start, start + duration)` interval against every other
+task's interval — either an O(n²) pairwise scan or a sweep-line algorithm that sorts
+by start time and tracks active intervals. For a single owner with a handful of pets
+and a few tasks a day, exact-match conflicts (e.g. two recurring daily tasks that
+happen to land on the same clock time) are the more common and more obviously
+actionable case, so the simpler check was implemented first. Overlap-aware detection
+is a reasonable next iteration if task volume grows.
 
 ---
 
