@@ -44,14 +44,68 @@ pip install -r requirements.txt
 
 ## 🖥️ Sample Output
 
-Paste a sample of your app's CLI or Streamlit output here so a reader can see what a generated plan looks like:
+Run `python3 main.py` to see the full daily report in the terminal:
 
 ```
-# e.g.:
-# Daily plan for Biscuit (Golden Retriever):
-#   08:00 — Morning walk (30 min) [priority: high]
-#   09:00 — Feeding (10 min) [priority: high]
-#   ...
+**************************************************
+  🐾  PawPal+ Daily Report
+  Thursday, July 09 2026
+**************************************************
+
+==================================================
+  Pets
+==================================================
+  • Mochi (Shiba Inu, age 3) — dog
+  • Luna (British Shorthair, age 5) — cat
+    Note: On daily allergy medication
+
+==================================================
+  Today's Schedule
+==================================================
+  1. [HIGH] Breakfast feeding
+       Pet      : Mochi
+       Category : feeding
+       Due      : 08:00 AM
+       Duration : 10 min
+       Status   : ⚠ Overdue
+  2. [HIGH] Allergy medication
+       Pet      : Luna
+       Category : medication
+       Due      : 08:30 AM
+       Duration : 5 min
+       Status   : ⚠ Overdue
+  3. [MEDIUM] Grooming session
+       Pet      : Mochi
+       Category : grooming
+       Due      : 11:00 AM
+       Duration : 20 min
+       Status   : ⚠ Overdue
+  4. [LOW] Playtime
+       Pet      : Luna
+       Category : exercise
+       Due      : 05:00 PM
+       Duration : 15 min
+       Status   : ⚠ Overdue
+
+==================================================
+  Care History (Completed Today)
+==================================================
+  ✓ Morning walk (Mochi) — completed at 07:54 PM
+
+==================================================
+  Upcoming Appointments
+==================================================
+  • Annual checkup for Mochi
+    Monday July 13 | City Vet Clinic | Dr. Patel
+    Reminder: 'Annual checkup' for Mochi is in 3 day(s). Location: City Vet Clinic. Vet: Dr. Patel.
+
+==================================================
+  Suggested Next Task
+==================================================
+  → Breakfast feeding for Mochi
+    Priority: high | Due: 08:00 AM
+
+==================================================
 ```
 
 ## 🧪 Testing PawPal+

@@ -6,13 +6,31 @@ Three core actions the user should be able to perform are: adding a pet to the s
 
 **a. Initial design**
 
-- Briefly describe your initial UML design.
-- What classes did you include, and what responsibilities did you assign to each?
+The system is built around four classes: Owner, Pet, Task, and Appointment.
+
+**Owner** is the top-level user of the system. It holds the owner's personal details (name, email, phone, address) and maintains a list of their pets. Its responsibilities are managing the pet roster (adding and removing pets) and providing a single point of access to all tasks and appointments across every pet they own.
+
+**Pet** sits at the centre of the design and acts as the link between the owner and their care activities. It stores the animal's profile (species, breed, age, weight, health notes) and is responsible for managing two collections — tasks and appointments — that belong to it. It exposes methods to retrieve upcoming tasks, past care history, and upcoming appointments.
+
+**Task** represents a single care action that needs to be performed for a pet, such as feeding, exercise, grooming, or medication. It carries scheduling information (due date, duration, recurrence) and a priority level that the scheduler uses to order work. Its responsibilities are tracking completion state, signalling when it is overdue, and returning a numeric priority score.
+
+**Appointment** represents a scheduled external event, typically a vet visit. It holds the location, vet name, appointment type, and a status that moves through its lifecycle (scheduled → confirmed → cancelled/completed). Its responsibilities are managing rescheduling and cancellation, and generating a human-readable reminder string.
 
 **b. Design changes**
 
-- Did your design change during implementation?
-- If yes, describe at least one change and why you made it.
+After reviewing the skeleton with an AI coding assistant, four issues were identified and addressed:
+
+**1. `Task.pet` and `Appointment.pet` made optional (default `None`)**
+Both fields were originally required constructor arguments. This created a circular dependency: you need a `Pet` object to create a `Task`, but the task may not be assigned to a pet yet. Making them optional and letting `Pet.add_task()` / `Pet.add_appointment()` set the link decouples object creation from assignment.
+
+**2. `Pet._tasks` and `Pet._appointments` marked `init=False`**
+`dataclass` fields with a leading underscore are intended to be private, but they still appeared as constructor parameters without `init=False`. Adding `init=False` hides them from the constructor, meaning only `add_task()` and `add_appointment()` can populate them — which is the correct interface.
+
+**3. `completed_at` field added to `Task`**
+`get_care_history()` is meant to show when care actually happened, but the only date field was `due_date` (when it was planned). These are different: a task due Monday could be completed on Wednesday. `completed_at` is set by `mark_complete()` and gives the history method accurate data to sort on.
+
+**4. `Scheduler` class added**
+The original design had no class to own the scheduling logic. `get_upcoming_tasks()` on `Pet` returns a list, but nothing builds an actual ordered daily plan. A `Scheduler` class was added to give this core responsibility a dedicated home, keeping the scheduling logic separate from the data model classes.
 
 ---
 
